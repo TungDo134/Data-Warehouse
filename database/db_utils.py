@@ -3,20 +3,27 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 import yaml
 
+from utils.format_path import resource_path
+
 # --- Đọc file config.yaml ---
+
+config_file = resource_path("config/db_config.yaml")
+
 def load_db_config(path="config/db_config.yaml"):
-    with open(path, "r", encoding="utf-8") as f:
+    with open(config_file, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)["mysql"]
 
-def load_to_mysql(df, table_name, source_file, config_path="config/db_config.yaml"):
-    DB_CONFIG = load_db_config(config_path)
+# KẾT NỐI TỚI DATABASE staging ( table: staging.rawtgdd )
+def load_to_staging_database(df, table_name, source_file):
+    DB_CONFIG = load_db_config()
 
     # --- 1️⃣ Kết nối MySQL server (chưa cần DB) ---
     conn = mysql.connector.connect(
         host=DB_CONFIG["host"],
         user=DB_CONFIG["user"],
         password=DB_CONFIG["password"],
-        port=DB_CONFIG["port"]
+        port=DB_CONFIG["port"],
+        auth_plugin='mysql_native_password'
     )
     cursor = conn.cursor()
 

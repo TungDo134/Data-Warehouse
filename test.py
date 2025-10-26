@@ -3,7 +3,7 @@ import os
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import pandas as pd
-from db_utils import load_to_mysql
+from database.db_utils import load_to_mysql
 
 # Thư mục bạn muốn lưu file
 output_dir = r"D:\Workspace-Python\DataWarehouse\TEST"

@@ -4,3 +4,10 @@ mysql:
   user: root
   password: ""
   database: staging
+
+data_control:
+  host: "localhost"
+  user: "root"
+  password: ""
+  database: "data_control"
+
