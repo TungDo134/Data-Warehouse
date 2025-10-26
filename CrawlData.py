@@ -49,7 +49,7 @@ def get_product_links(driver, category_url, base_url, record_limit=None, max_cli
     for a in soup.select("ul.listproduct a.main-contain"):
         href = a.get("href")
         if href and href.startswith("/dtdd/"):
-            full_link = base_url + href
+            full_link = base_url.rstrip("/") + href
             product_links.append(full_link)
 
             name_tag = a.select_one("h3")
