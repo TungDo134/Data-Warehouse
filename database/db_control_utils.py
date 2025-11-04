@@ -19,7 +19,7 @@ def get_crawl_config(config_name):
     cursor = conn.cursor(dictionary=True)
 
     query = """
-        SELECT source_url, target_table, max_clicks, record_limit
+        SELECT source_url, target_table, max_clicks, record_limit, src_folder
         FROM `data_control.config`
         WHERE config_name = %s AND is_active = 1
         LIMIT 1

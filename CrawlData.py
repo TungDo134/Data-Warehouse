@@ -94,7 +94,7 @@ def safe_get(driver, url, retries=3):
             time.sleep(random.uniform(2.5, 4.5))
             return BeautifulSoup(driver.page_source, "lxml")
         except Exception as e:
-            print(f"⚠️ Lỗi tải ({attempt + 1}/{retries}): {e}")
+            print(f"⚠️ Lỗi tải ({attempt + 1}/{retries})")
             if attempt == retries - 1:
                 print(f"❌ Bỏ qua {url}")
                 return None
@@ -163,7 +163,7 @@ def run_crawl_pipeline():
     record_limit = config["record_limit"]
 
     category_url = url + "dtdd"
-    output_dir = r"D:\Workspace-Python\Data-Warehouse\Crawl Data"
+    output_dir = config["src_folder"]
 
     driver = init_driver()
 
