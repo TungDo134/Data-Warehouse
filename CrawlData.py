@@ -79,6 +79,7 @@ def get_product_links(driver, category_url, base_url, record_limit=None, max_cli
         product_links = product_links[:record_limit]
         products = products[:record_limit]
         print(f"🧪 Đang test với {len(products)} sản phẩm đầu tiên (record_limit = {record_limit}).")
+        # print(products)
     else:
         print(f"📦 Không giới hạn số lượng — lấy toàn bộ {total} sản phẩm.")
 
@@ -176,9 +177,7 @@ def run_crawl_pipeline():
         driver.quit()
 
 
-#
-# if __name__ == "__main__":
-#     run_crawl_pipeline()
+
 
 if __name__ == "__main__":
     try:

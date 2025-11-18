@@ -3,7 +3,7 @@ import subprocess
 import os
 import sys
 
-
+# Crawl data (TD) --> load to dw (TK)
 def run_script(script_path):
     try:
         print(f"\n🚀 Đang chạy: {os.path.basename(script_path)} ...")
