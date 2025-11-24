@@ -11,7 +11,6 @@ from selenium.webdriver.chrome.options import Options
 from database.db_utils import load_to_staging_database
 from database.db_control_utils import get_crawl_config
 
-
 # ===================== INIT CHROME DRIVER =====================
 def init_driver():
     chrome_options = Options()
@@ -22,7 +21,6 @@ def init_driver():
     chrome_options.add_argument("window-size=1920,1080")
     driver = webdriver.Chrome(options=chrome_options)
     return driver
-
 
 # =====================  FUNC GET LINK PRODUCTS =====================
 def get_product_links(driver, category_url, base_url, record_limit=None, max_clicks=1):
@@ -85,7 +83,6 @@ def get_product_links(driver, category_url, base_url, record_limit=None, max_cli
 
     return products
 
-
 # ===================== SAFE GET (PREVENT BROWSER FREEZING) =====================
 def safe_get(driver, url, retries=3):
     for attempt in range(retries):
@@ -101,7 +98,6 @@ def safe_get(driver, url, retries=3):
                 return None
             time.sleep(2)
     return None
-
 
 # ===================== FUNC CRAWL DETAIL PRODUCT =====================
 def crawl_product_details(driver, products):
@@ -131,7 +127,6 @@ def crawl_product_details(driver, products):
     print(f"🎯 Đã thu thập được {len(all_data)} sản phẩm hợp lệ.")
     return all_data
 
-
 # ===================== SAVE FILE EXCEL =====================
 def save_to_excel(all_data, output_dir):
     os.makedirs(output_dir, exist_ok=True)
@@ -147,7 +142,6 @@ def save_to_excel(all_data, output_dir):
     df.to_excel(filename, index=False)
     print(f"🎉 Crawl hoàn tất. Đã lưu file: {filename}")
     return df, filename
-
 
 # ===================== MAIN =====================
 def run_crawl_pipeline():
@@ -175,9 +169,6 @@ def run_crawl_pipeline():
         load_to_staging_database(df, table_name, os.path.basename(filename))
     finally:
         driver.quit()
-
-
-
 
 if __name__ == "__main__":
     try:
