@@ -37,23 +37,34 @@ def create_table_from_excel(excel_path, sheet_name, conn, db_name="data_storage"
     col_type = next((c for c in df_struct.columns if "type" in c), None)
     df_struct = df_struct[df_struct[col_field].notna()]
 
-    sql_cols = []
-    pk_cols = []
+    sql_cols = ["`id` INT NOT NULL AUTO_INCREMENT"]  # thêm cột id tự tăng
+    pk_cols = ["id"]  # primary key là id
 
     for _, row in df_struct.iterrows():
         field = str(row[col_field]).strip()
         dtype = str(row[col_type]).strip().upper()
-        if "VARCHAR" in dtype:
-            dtype = "VARCHAR(255)"
-            print(f"{field}: {dtype}")
 
-        is_pk = field.lower() == "product_id"
-        not_null = "NOT NULL" if is_pk else ""
-        sql_cols.append(f"`{field}` {dtype} {not_null}")
-        if is_pk:
-            pk_cols = ["product_id"]
+        # product_id riêng
+        if field == "product_id":
+            dtype = "VARCHAR(50)"
+            sql_cols.append(f"`{field}` {dtype} NOT NULL UNIQUE")
+        # các cột chữ khác
+        elif dtype in ["VARCHAR", "TEXT"] or field in ["product_name", "operating_system", "cpu_chip", "cpu_speed",
+                                                       ...]:
+            dtype = "TEXT"
+            sql_cols.append(f"`{field}` {dtype} NULL")
+        # DECIMAL cho giá
+        elif field == "product_price":
+            dtype = "DECIMAL(18,2)"
+            sql_cols.append(f"`{field}` {dtype} NULL")
+        # DATE cho release_date
+        elif field == "release_date":
+            dtype = "DATE"
+            sql_cols.append(f"`{field}` {dtype} NULL")
+        else:
+            sql_cols.append(f"`{field}` {dtype} NULL")
 
-    pk_clause = f", PRIMARY KEY ({','.join([f'`{c}`' for c in pk_cols])})" if pk_cols else ""
+    pk_clause = f", PRIMARY KEY ({','.join([f'`{c}`' for c in pk_cols])})"
     create_sql = f"CREATE TABLE IF NOT EXISTS `{db_name}`.`{sheet_name}` ({', '.join(sql_cols)} {pk_clause}) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
 
     print("\n______SQL sinh ra:")
@@ -62,7 +73,6 @@ def create_table_from_excel(excel_path, sheet_name, conn, db_name="data_storage"
         cursor.execute(create_sql)
         conn.commit()
     print(f"+++++++++Bảng `{sheet_name}` đã được tạo trong database `{db_name}`.")
-
 
 # ====================== ĐỌC STAGING ======================
 def read_staging_from_db():
@@ -91,16 +101,28 @@ def load_to_mysql(df, table_name):
     DB_CONFIG = load_db_config()
     conn = mysql.connector.connect(**DB_CONFIG)
     cursor = conn.cursor()
-    cols = list(df.columns)
+    # Loại bỏ cột 'id' vì auto_increment
+    # Loại bỏ cột AUTO_INCREMENT 'id' và dùng product_id nếu có
+    cols = [c for c in df.columns if c != "id"]
+
     placeholders = ",".join(["%s"] * len(cols))
     col_names = ",".join([f"`{c}`" for c in cols])
-    update_clause = ",".join([f"`{c}`=VALUES(`{c}`)" for c in cols if c != "product_id"])
-    sql = f"INSERT INTO `data_storage`.`{table_name}` ({col_names}) VALUES ({placeholders}) ON DUPLICATE KEY UPDATE {update_clause}"
+    update_clause = ",".join([f"`{c}`=VALUES(`{c}`)" for c in cols if c != "id"])
+
+
+    sql = f"""
+    INSERT INTO `data_storage`.`{table_name}` ({col_names})
+    VALUES ({placeholders})
+    ON DUPLICATE KEY UPDATE {update_clause}
+    """
+
     for _, row in df.iterrows():
+        values = [row[c] for c in cols]
         try:
-            cursor.execute(sql, tuple(row))
+            cursor.execute(sql, values)
         except Exception as e:
-            print(f"**Lỗi khi ghi dòng {row.get('product_id', '')}: {e}**")
+            print(f"**Lỗi khi ghi dòng {row.get('product_name', '')}: {e}**")
+
     conn.commit()
     cursor.close()
     conn.close()
@@ -174,17 +196,33 @@ if __name__ == "__main__":
         else:
             df_dim[dim_col] = None
 
-    # Metadata
+    # --- Chỉ giữ các dòng có dữ liệu quan trọng
+    required_cols = ["release_date", "product_name", "product_price"]
+    df_dim = df_dim.dropna(subset=required_cols)
+
+    # --- Chuyển release_date sang định dạng MySQL
+    df_dim["release_date"] = pd.to_datetime(
+        df_dim["release_date"], errors="coerce", format="%m/%Y"
+    )
+    df_dim = df_dim[df_dim["release_date"].notna()]  # loại bỏ convert lỗi
+    df_dim["release_date"] = df_dim["release_date"].dt.strftime("%Y-%m-%d")
+
+    # --- Điền product_id nếu thiếu
+    if "product_id" in df_dim.columns:
+        # tạo Series cùng index với df_dim
+        df_dim["product_id"] = df_dim["product_id"].fillna(
+            pd.Series([f"P{i:05d}" for i in range(1, len(df_dim) + 1)], index=df_dim.index)
+        )
+
+    # --- Metadata
     now_vn = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh"))
     if "dt_expired" in df_dim.columns:
         df_dim["dt_expired"] = now_vn.strftime("%Y-%m-%d %H:%M:%S")
     if "source_file" in df_dim.columns:
         df_dim["source_file"] = source_label
-    if "product_id" in df_dim.columns and df_dim["product_id"].isna().all():
-        df_dim["product_id"] = [f"P{i:05d}" for i in range(1, len(df_dim) + 1)]
 
+    # --- Chuyển nan còn lại thành None để MySQL chấp nhận
     df_dim = df_dim.where(pd.notnull(df_dim), None)
-    print(df_dim.head())
 
     # === Xuất file Excel với timestamp ===
     output_dir = r"D:\Workspace-Python\Data-Warehouse\Data_storage_DIM"
