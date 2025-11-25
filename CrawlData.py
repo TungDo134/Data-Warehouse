@@ -11,7 +11,9 @@ from selenium.webdriver.chrome.options import Options
 from database.db_utils import load_to_staging_database
 from database.db_control_utils import get_crawl_config
 
+
 # ===================== INIT CHROME DRIVER =====================
+# 5. Chạy hàm "init_driver" lấy chrome driver
 def init_driver():
     chrome_options = Options()
     chrome_options.add_argument("--headless=new")
@@ -22,7 +24,15 @@ def init_driver():
     driver = webdriver.Chrome(options=chrome_options)
     return driver
 
-# =====================  FUNC GET LINK PRODUCTS =====================
+    # =====================  FUNC GET LINK PRODUCTS =====================
+
+
+"""
+ 6. Chạy hàm get_product_links(driver, category_url, url, record_limit, max_clicks)"
+ để lấy link các sản phẩm cần crawl
+"""
+
+
 def get_product_links(driver, category_url, base_url, record_limit=None, max_clicks=1):
     print(f"🔍 Đang thu thập danh sách sản phẩm từ: {category_url}")
     driver.get(category_url)
@@ -81,7 +91,9 @@ def get_product_links(driver, category_url, base_url, record_limit=None, max_cli
     else:
         print(f"📦 Không giới hạn số lượng — lấy toàn bộ {total} sản phẩm.")
 
+    # 7. Return products
     return products
+
 
 # ===================== SAFE GET (PREVENT BROWSER FREEZING) =====================
 def safe_get(driver, url, retries=3):
@@ -99,15 +111,26 @@ def safe_get(driver, url, retries=3):
             time.sleep(2)
     return None
 
+
 # ===================== FUNC CRAWL DETAIL PRODUCT =====================
+
+"""
+8. Chạy hàm
+crawl_product_details(driver, products) để lấy thông tin từ các link ở hàm get_product_links
+"""
+
+
 def crawl_product_details(driver, products):
     all_data = []
     for i, base_info in enumerate(products, start=1):
         url = base_info["Source"]
         print(f"📦 ({i}/{len(products)}) Đang xử lý: {url}")
 
+        # 9. soup = safe_get(driver, url)
+        # 10 Bỏ qua sản phẩm hiện tại
         soup = safe_get(driver, url)
         if not soup:
+            # 11. Tiếp tục chạy logic hàm crawl_product_details
             continue
 
         config = base_info.copy()
@@ -125,10 +148,15 @@ def crawl_product_details(driver, products):
 
         all_data.append(config)
     print(f"🎯 Đã thu thập được {len(all_data)} sản phẩm hợp lệ.")
+    # 12. Return all_data
     return all_data
 
+
 # ===================== SAVE FILE EXCEL =====================
+
+# 13. Chạy hàm save_to_excel(all_data, output_dir)
 def save_to_excel(all_data, output_dir):
+    # 13.1. Tạo thư mục từ tham số output_dir
     os.makedirs(output_dir, exist_ok=True)
     df = pd.DataFrame(all_data)
     df = df.drop(columns=["Thẻ nhớ:", "Sạc kèm theo máy:", "Radio:",
@@ -139,13 +167,17 @@ def save_to_excel(all_data, output_dir):
     timestamp = now_vn.strftime("%Y_%m_%d_%H_%M_%S")
     filename = os.path.join(output_dir, f"tgdd_products_{timestamp}.xlsx")
 
+    # 14. Tạo df, ghi file excel
     df.to_excel(filename, index=False)
     print(f"🎉 Crawl hoàn tất. Đã lưu file: {filename}")
+
+    # 15. Return df, filename
     return df, filename
+
 
 # ===================== MAIN =====================
 def run_crawl_pipeline():
-    # Đọc config từ DB
+    # 1. kết nối database data_control
     config = get_crawl_config("TGDD")
 
     if not config:
@@ -170,10 +202,12 @@ def run_crawl_pipeline():
     finally:
         driver.quit()
 
+
 if __name__ == "__main__":
     try:
         run_crawl_pipeline()
     except Exception as e:
         import traceback
+
         traceback.print_exc()
         input("Press Enter to exit...")

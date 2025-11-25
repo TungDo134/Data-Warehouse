@@ -9,15 +9,19 @@ from utils.format_path import resource_path
 
 config_file = resource_path("config/db_config.yaml")
 
+# 17. Đọc config từ file yaml "config/db_config.yaml"
 def load_db_config(path="config/db_config.yaml"):
     with open(config_file, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)["mysql"]
 
 # KẾT NỐI TỚI DATABASE staging ( table: staging.rawtgdd )
+
+# 16. Chạy hàm load_to_staging_database(df, table_name, os.path.basename(filename))
 def load_to_staging_database(df, table_name, source_file):
     DB_CONFIG = load_db_config()
 
-    # --- 1️⃣ Kết nối MySQL server (chưa cần DB) ---
+    # --- 1 Kết nối MySQL server (chưa cần DB) ---
+    # 18. Kết nối database staging
     conn = mysql.connector.connect(
         host=DB_CONFIG["host"],
         user=DB_CONFIG["user"],
@@ -27,7 +31,8 @@ def load_to_staging_database(df, table_name, source_file):
     )
     cursor = conn.cursor()
 
-    # --- 2️⃣ Tạo database nếu chưa có ---
+    # --- 2 Tạo database nếu chưa có ---
+    # 19. Tạo database staging
     try:
         cursor.execute(f"CREATE DATABASE IF NOT EXISTS `{DB_CONFIG['database']}` DEFAULT CHARACTER SET utf8mb4;")
         print(f"✅ Database `{DB_CONFIG['database']}` đã sẵn sàng.")
@@ -37,15 +42,17 @@ def load_to_staging_database(df, table_name, source_file):
 
     conn.database = DB_CONFIG["database"]
 
-    # --- 3️⃣ Thêm cột meta ---
+    # --- 3 Thêm cột meta ---
+    # 20. Thêm 2 cột vào df: created_at, source_file
     now_vn = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh"))
     df["created_at"] = now_vn.strftime("%Y-%m-%d %H:%M:%S")
     df["source_file"] = source_file
 
-    # --- 4️⃣ Chuyển toàn bộ sang TEXT để tránh lỗi data type ---
+    # --- 4 Chuyển toàn bộ sang TEXT để tránh lỗi data type ---
+    # 21. Chuyển toàn bộ df sang text
     df = df.astype(str)
 
-    # --- 5️⃣ Tạo bảng nếu chưa có ---
+    # ---  5 Tạo bảng nếu chưa có ---
     columns_sql = ", ".join([f"`{col}` TEXT" for col in df.columns])
     create_sql = f"""
         CREATE TABLE IF NOT EXISTS `{table_name}` (
@@ -55,7 +62,7 @@ def load_to_staging_database(df, table_name, source_file):
     """
     cursor.execute(create_sql)
 
-    # --- 6️⃣ Đồng bộ cột giữa DB và DataFrame ---
+    # --- 6 Đồng bộ cột giữa DB và DataFrame ---
     cursor.execute(f"SHOW COLUMNS FROM `{table_name}`")
     db_columns = [c[0] for c in cursor.fetchall()]
 
@@ -73,7 +80,8 @@ def load_to_staging_database(df, table_name, source_file):
     # Reorder df để khớp với bảng DB
     df = df[[c for c in db_columns if c != "id"]]
 
-    # --- 7️⃣ Upsert thông minh ---
+    # --- 7 Upsert  ---
+    # 22. Kiểm tra dữ liệu đã tồn tại chưa
     cursor.execute(f"SELECT * FROM `{table_name}`")
     existing_rows = cursor.fetchall()
     existing_cols = [desc[0] for desc in cursor.description]
@@ -96,6 +104,7 @@ def load_to_staging_database(df, table_name, source_file):
         if not key:
             continue
 
+        # 23. Kiểm tra xem có thay đổi giá trị nào không
         if key in existing_dict:
             # So sánh các giá trị trừ meta
             old = existing_dict[key]
@@ -104,15 +113,18 @@ def load_to_staging_database(df, table_name, source_file):
                 for c in df.columns if c not in ("created_at", "source_file")
             )
             if different:
+                # 23.2. Update staging.rawtgdd SET data WHERE condition
                 set_clause = ", ".join([f"`{c}`=%s" for c in df.columns])
                 update_sql = f"UPDATE `{table_name}` SET {set_clause} WHERE `Tên sản phẩm`=%s"
                 cursor.execute(update_sql, [str(row[c]) for c in df.columns] + [key])
                 update_count += 1
             else:
+                # 23.1 Bỏ qua data
                 skip_count += 1
         else:
             cols = ", ".join([f"`{c}`" for c in df.columns])
             placeholders = ", ".join(["%s"] * len(df.columns))
+            # 22.1. Insert data into staging.rawtgdd
             insert_sql = f"INSERT INTO `{table_name}` ({cols}) VALUES ({placeholders})"
             cursor.execute(insert_sql, tuple(row[c] for c in df.columns))
             insert_count += 1
