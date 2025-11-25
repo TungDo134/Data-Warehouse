@@ -1,9 +1,8 @@
-# file1.py
+
 import subprocess
 import os
 import sys
 
-# Crawl data (TD) --> load to dw (TK)
 def run_script(script_path):
     try:
         print(f"\n🚀 Đang chạy: {os.path.basename(script_path)} ...")
@@ -20,7 +19,14 @@ if __name__ == "__main__":
     # --- Bước 1: Crawl data ---
     run_script(r"D:\Workspace-Python\Data-Warehouse\CrawlData.py")
 
-    # --- Bước 2: Load vào Data Warehouse ---
-    run_script(r"D:\Workspace-Python\Data-Warehouse\LoadToDW.py")
+    # --- Bước 2: ETL --> Load vào Data Warehouse ---
+    # run_script(r"D:\Workspace-Python\Data-Warehouse\LoadToDW.py")
+    run_script(r"D:\Workspace-Python\Data-Warehouse\LoadToDW_log.py")
+
+    # --- Bước 3: Tạo db data_mart và các table tương ứng ---
+    run_script(r"D:\Workspace-Python\Data-Warehouse\CreateTableAT.py")
+
+    # --- Bước 4: Insert dữ liệu vào các table ---
+    run_script(r"D:\Workspace-Python\Data-Warehouse\AgrreateTable.py")
 
     print("🎉 Hoàn tất toàn bộ quá trình")
