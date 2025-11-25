@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 from unidecode import unidecode
 from sqlalchemy import create_engine, text
 
-# Import log utilities
+# Import log utilities (giả sử có file utils/log_utils.py)
 try:
     from utils.log_utils import write_log
 except ImportError:
@@ -43,7 +43,7 @@ structure_path = r"D:\Workspace-Python\Data-Warehouse\Data Warehouse.xlsx"
 table_name = "dim_products"
 source_label = "TGDD"
 
-
+# 5.3.1.0 KẾT NỐI DB
 def get_connection():
     return mysql.connector.connect(
         host="localhost",
@@ -52,13 +52,14 @@ def get_connection():
         database="data_storage"
     )
 
-
+# 5.3.1.1 Đọc config từ YAML
 def load_db_config(path="config/db_config.yaml"):
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)["mysql"]
 
 
 # ======================TẠO BẢNG DIM TỪ EXCEL ======================
+# 5.3.1.2 TẠO BẢNG DIM TỪ EXCEL
 def create_table_from_excel(excel_path, sheet_name, conn, db_name="data_storage"):
     """Tạo bảng DIM từ cấu trúc Excel"""
     try:
@@ -125,6 +126,7 @@ def create_table_from_excel(excel_path, sheet_name, conn, db_name="data_storage"
 
 
 # ====================== ĐỌC STAGING ======================
+# 5.3.1.3 ĐỌC STAGING
 def read_staging_from_db():
     """Đọc dữ liệu từ staging database"""
     try:
@@ -136,6 +138,7 @@ def read_staging_from_db():
         df = pd.read_sql("SELECT * FROM `staging`.`staging.rawtgdd`", engine)
         engine.dispose()
 
+        # 5.3.1.4 Chuẩn hóa tên cột staging
         df.columns = [re.sub(r'[^a-z0-9]+', '_', unidecode(c).lower()).strip('_') for c in df.columns]
 
         print(f"✅ Đã đọc {len(df)} dòng từ staging.rawtgdd")
@@ -167,6 +170,7 @@ def read_staging_from_db():
 
 
 # ======================LẤY CỘT DIM ======================
+# 5.3.1.5 LẤY CỘT DIM
 def get_table_columns(conn, table_name):
     """Lấy danh sách cột từ bảng DIM"""
     try:
@@ -183,6 +187,7 @@ def get_table_columns(conn, table_name):
 
 
 # ====================== LOAD TO MYSQL ======================
+# 5.3.1.10 LOAD TO MYSQL (UPSERT)
 def load_to_mysql(df, table_name):
     """Load dữ liệu vào MySQL với INSERT ... ON DUPLICATE KEY UPDATE"""
     try:
@@ -247,6 +252,7 @@ def load_to_mysql(df, table_name):
 
 
 # ======================MAPPING CỨNG ======================
+# 5.3.1.6 MANUAL MAPPING
 manual_mapping = {
     "product_name": "ten_san_pham",
     "product_price": "gia",
@@ -295,6 +301,7 @@ manual_mapping = {
 }
 
 # ======================MAIN ETL ======================
+
 if __name__ == "__main__":
     print("=" * 60)
     print("🚀 BẮT ĐẦU LOAD DIM_PRODUCT")
@@ -311,18 +318,24 @@ if __name__ == "__main__":
 
     try:
         # ========== BƯỚC 1: TẠO BẢNG ==========
+        # 5.3.1.0 Kết nối DB
         conn = get_connection()
+        # 5.3.1.2 Tạo bảng DIM
         create_table_from_excel(structure_path, table_name, conn)
 
         # ========== BƯỚC 2: ĐỌC STAGING ==========
+        # 5.3.1.3 Đọc staging
         df_staging = read_staging_from_db()
 
         # ========== BƯỚC 3: LẤY CẤU TRÚC DIM ==========
+        # 5.3.1.5 Đọc cấu trúc cột DIM
         dim_fields = get_table_columns(conn, table_name)
 
         # ========== BƯỚC 4: MAPPING DỮ LIỆU ==========
+
         print("\n🔄 Đang mapping dữ liệu từ staging sang DIM...")
 
+        # 5.3.1.6 Bắt đầu Mapping
         df_dim = pd.DataFrame(columns=dim_fields)
         df_staging.columns = [c.strip().lower() for c in df_staging.columns]
 
@@ -337,27 +350,28 @@ if __name__ == "__main__":
 
         # ========== BƯỚC 5: CLEAN DỮ LIỆU ==========
         print("\n🧹 Đang clean dữ liệu...")
-
+        # 5.3.1.7 Xử lý dữ liệu thiếu
         required_cols = ["release_date", "product_name", "product_price"]
         df_dim = df_dim.dropna(subset=required_cols)
 
         df_dim["release_date"] = pd.to_datetime(
             df_dim["release_date"], errors="coerce", format="%m/%Y"
         )
+        # chuyển release_date
         df_dim = df_dim[df_dim["release_date"].notna()]
         df_dim["release_date"] = df_dim["release_date"].dt.strftime("%Y-%m-%d")
-
+        # tạo product_id
         if "product_id" in df_dim.columns:
             df_dim["product_id"] = df_dim["product_id"].fillna(
                 pd.Series([f"P{i:05d}" for i in range(1, len(df_dim) + 1)], index=df_dim.index)
             )
-
+        # 5.3.1.8 Thêm metadata
         now_vn = datetime.now(ZoneInfo("Asia/Ho_Chi_Minh"))
         if "dt_expired" in df_dim.columns:
             df_dim["dt_expired"] = now_vn.strftime("%Y-%m-%d %H:%M:%S")
         if "source_file" in df_dim.columns:
             df_dim["source_file"] = source_label
-
+        # 5.3.1.9 Chuyển NaN → None
         df_dim = df_dim.where(pd.notnull(df_dim), None)
 
         cleaned_count = len(df_dim)
@@ -375,7 +389,7 @@ if __name__ == "__main__":
 
         # ========== BƯỚC 6: XUẤT FILE EXCEL ==========
         print("\n📄 Đang xuất file Excel...")
-
+        # 5.3.1.10 Xuất Excel DIM
         output_dir = r"D:\Workspace-Python\Data-Warehouse\Data_storage_DIM"
         os.makedirs(output_dir, exist_ok=True)
 
@@ -395,6 +409,7 @@ if __name__ == "__main__":
         )
 
         # ========== BƯỚC 7: LOAD VÀO MYSQL ==========
+        # 5.3.1.11 LOAD vào MYSQL
         load_to_mysql(df_dim, table_name)
 
         # ========== HOÀN THÀNH ==========
